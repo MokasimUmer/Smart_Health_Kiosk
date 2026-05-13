@@ -1,12 +1,34 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
-  // On phone: use your Linux PC's IP so the app can reach the backend (same WiFi).
-  // Find PC IP: hostname -I | awk '{print $1}' (e.g. 192.168.1.105). USB tethering: 192.168.137.1
-  // Chrome/web: use http://localhost:5000/api
-  static const String _baseUrl = 'http://192.168.1.100:5000/api';
+  // Default to current PC IP. Can be overridden in-app via Settings.
+  static const String _defaultPcIp = '192.168.137.1';
+  static const String _ipPrefKey = 'server_ip';
+
+  static String? _cachedIp;
+
+  static Future<String> getServerIp() async {
+    if (_cachedIp != null) return _cachedIp!;
+    final prefs = await SharedPreferences.getInstance();
+    _cachedIp = prefs.getString(_ipPrefKey) ?? _defaultPcIp;
+    return _cachedIp!;
+  }
+
+  static Future<void> setServerIp(String ip) async {
+    _cachedIp = ip;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_ipPrefKey, ip);
+  }
+
+  static Future<String> get _baseUrl async {
+    if (kIsWeb) return 'http://localhost:5000/api';
+    final ip = await getServerIp();
+    return 'http://$ip:5000/api';
+  }
+
   static String? _token;
   static Map<String, dynamic>? _patient;
 
@@ -20,7 +42,16 @@ class AuthService {
   }
 
   static Map<String, dynamic>? get patient => _patient;
-  static String get baseUrl => _baseUrl;
+
+  static Future<String> get baseUrl => _baseUrl;
+
+  /// Base URL for uploads (e.g. hospital photos): same host as API but without /api.
+  /// Uses the cached IP synchronously — call getServerIp() at least once before using this.
+  static String get uploadsBase {
+    final ip = _cachedIp ?? _defaultPcIp;
+    if (kIsWeb) return 'http://localhost:5000';
+    return 'http://$ip:5000';
+  }
 
   static Map<String, String> get headers => {
     'Content-Type': 'application/json',
@@ -34,8 +65,9 @@ class AuthService {
     double? latitude,
     double? longitude,
   }) async {
+    final base = await _baseUrl;
     final res = await http.post(
-      Uri.parse('$_baseUrl/auth/patient/signup'),
+      Uri.parse('$base/auth/patient/signup'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'name': name,
@@ -56,8 +88,9 @@ class AuthService {
     required String phone,
     required String password,
   }) async {
+    final base = await _baseUrl;
     final res = await http.post(
-      Uri.parse('$_baseUrl/auth/patient/login'),
+      Uri.parse('$base/auth/patient/login'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'phone': phone, 'password': password}),
     );
@@ -85,8 +118,10 @@ class AuthService {
   }
 
   static Future<Map<String, dynamic>> fetchMe() async {
+    await getToken(); // ensure token is loaded
+    final base = await _baseUrl;
     final res = await http.get(
-      Uri.parse('$_baseUrl/auth/me'),
+      Uri.parse('$base/auth/me'),
       headers: headers,
     );
     final data = jsonDecode(res.body);

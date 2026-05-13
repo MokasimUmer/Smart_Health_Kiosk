@@ -2,17 +2,17 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
+import 'language_service.dart';
 
 class ApiService {
-  static String get _base => AuthService.baseUrl;
-
   static Future<Map<String, dynamic>> uploadSubscriptionReceipt({
     required Uint8List receiptBytes,
     required String receiptFilename,
     required double amount,
     required String paymentMethod,
   }) async {
-    final uri = Uri.parse('$_base/subscriptions');
+    final base = await AuthService.baseUrl;
+    final uri = Uri.parse('$base/subscriptions');
     final req = http.MultipartRequest('POST', uri)
       ..headers.addAll({'Authorization': 'Bearer ${await AuthService.getToken()}'})
       ..fields['amount'] = amount.toString()
@@ -23,8 +23,9 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getMySubscription() async {
+    final base = await AuthService.baseUrl;
     final res = await http.get(
-      Uri.parse('$_base/subscriptions/mine'),
+      Uri.parse('$base/subscriptions/mine'),
       headers: AuthService.headers,
     );
     return jsonDecode(res.body);
@@ -34,8 +35,9 @@ class ApiService {
     required String kioskId,
     required Map<String, dynamic> vitals,
   }) async {
+    final base = await AuthService.baseUrl;
     final res = await http.post(
-      Uri.parse('$_base/measurements'),
+      Uri.parse('$base/measurements'),
       headers: AuthService.headers,
       body: jsonEncode({'kioskId': kioskId, 'vitals': vitals}),
     );
@@ -47,15 +49,25 @@ class ApiService {
     required double latitude,
     required double longitude,
   }) async {
+    await AuthService.getToken(); // ensure token loaded so headers include Bearer
+    final base = await AuthService.baseUrl;
+
+    // Send the current app language so Gemini replies in the same language
+    final language = LanguageService.instance.currentCode; // 'en' | 'am' | 'om'
+
     final res = await http.post(
-      Uri.parse('$_base/measurements/analyze'),
+      Uri.parse('$base/measurements/analyze'),
       headers: AuthService.headers,
       body: jsonEncode({
         'measurementId': measurementId,
         'latitude': latitude,
         'longitude': longitude,
+        'language': language,
       }),
     );
+    if (res.statusCode != 200) {
+      throw Exception('Analysis failed: ${res.statusCode} ${res.body}');
+    }
     return jsonDecode(res.body);
   }
 
@@ -69,7 +81,8 @@ class ApiService {
     required String paymentMethod,
     required String conditionLabel,
   }) async {
-    final uri = Uri.parse('$_base/appointments');
+    final base = await AuthService.baseUrl;
+    final uri = Uri.parse('$base/appointments');
     final req = http.MultipartRequest('POST', uri)
       ..headers.addAll({'Authorization': 'Bearer ${await AuthService.getToken()}'})
       ..fields['hospitalId'] = hospitalId
@@ -84,16 +97,18 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getMyAppointments() async {
+    final base = await AuthService.baseUrl;
     final res = await http.get(
-      Uri.parse('$_base/appointments/mine'),
+      Uri.parse('$base/appointments/mine'),
       headers: AuthService.headers,
     );
     return jsonDecode(res.body);
   }
 
   static Future<Map<String, dynamic>> getMyMeasurements() async {
+    final base = await AuthService.baseUrl;
     final res = await http.get(
-      Uri.parse('$_base/measurements/mine'),
+      Uri.parse('$base/measurements/mine'),
       headers: AuthService.headers,
     );
     return jsonDecode(res.body);

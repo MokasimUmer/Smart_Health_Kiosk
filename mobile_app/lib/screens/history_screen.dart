@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/language_service.dart';
 import '../services/sync_service.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -36,39 +37,54 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = LanguageService.instance.strings;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Measurement History'),
+        title: Text(s.historyTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loading ? null : () { setState(() => _loading = true); _load(); },
+            onPressed: _loading
+                ? null
+                : () {
+                    setState(() => _loading = true);
+                    _load();
+                  },
           ),
         ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _measurements.isEmpty && _pending.isEmpty
-              ? const Center(child: Text('No measurements yet'))
+              ? Center(child: Text(s.noMeasurements))
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
                       if (_pending.isNotEmpty) ...[
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 8),
-                          child: Text('Pending sync', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.orange)),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(s.pendingSync,
+                              style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.orange)),
                         ),
-                        ..._pending.map((m) => _buildCard(m, pending: true)),
+                        ..._pending
+                            .map((m) => _buildCard(m, pending: true)),
                         const SizedBox(height: 16),
                       ],
                       if (_measurements.isNotEmpty)
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 8),
-                          child: Text('Synced', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(s.synced,
+                              style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600)),
                         ),
-                      ..._measurements.map((m) => _buildCard(m, pending: false)),
+                      ..._measurements
+                          .map((m) => _buildCard(m, pending: false)),
                     ],
                   ),
                 ),
@@ -76,8 +92,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Widget _buildCard(dynamic m, {required bool pending}) {
+    final s = LanguageService.instance.strings;
     final v = (m['vitals'] ?? {}) as Map;
-    final date = DateTime.tryParse(m['measuredAt']?.toString() ?? '') ?? DateTime.now();
+    final date =
+        DateTime.tryParse(m['measuredAt']?.toString() ?? '') ??
+            DateTime.now();
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -88,15 +107,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text(
+                  '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
                 Row(
                   children: [
                     if (pending)
-                      const Padding(
-                        padding: EdgeInsets.only(right: 8),
-                        child: Chip(label: Text('Pending sync', style: TextStyle(fontSize: 11)), backgroundColor: Colors.orange),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Chip(
+                          label: Text(s.pendingSyncChip,
+                              style: const TextStyle(fontSize: 11)),
+                          backgroundColor: Colors.orange,
+                        ),
                       ),
-                    Text('Kiosk: ${m['kioskId'] ?? '-'}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text(s.kioskLabel(m['kioskId'] ?? '-'),
+                        style: const TextStyle(
+                            fontSize: 12, color: Colors.grey)),
                   ],
                 ),
               ],
@@ -106,10 +134,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
               spacing: 16,
               runSpacing: 8,
               children: [
-                _chip('BP', '${v['systolicBP'] ?? '-'}/${v['diastolicBP'] ?? '-'}'),
                 _chip('HR', '${v['heartRate'] ?? '-'}'),
                 _chip('SpO2', '${v['spo2'] ?? '-'}%'),
                 _chip('Temp', '${v['temperatureCelsius'] ?? '-'}°C'),
+                _chip('Height',
+                    v['heightCm'] != null ? '${v['heightCm']} cm' : '-'),
+                _chip(
+                    'Weight',
+                    (v['weightKg'] != null && v['weightKg'] != 0)
+                        ? '${v['weightKg']} kg'
+                        : '-'),
                 _chip('BMI', '${v['bmi'] ?? '-'}'),
               ],
             ),
@@ -122,8 +156,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget _chip(String label, String value) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+        Text(label,
+            style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        Text(value,
+            style: const TextStyle(fontWeight: FontWeight.w600)),
       ],
     );
   }

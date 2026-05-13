@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
+import '../services/language_service.dart';
 
 class AppointmentsScreen extends StatefulWidget {
   const AppointmentsScreen({super.key});
@@ -21,7 +23,10 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
   Future<void> _load() async {
     try {
       final res = await ApiService.getMyAppointments();
-      setState(() { _appointments = res['appointments'] ?? []; _loading = false; });
+      setState(() {
+        _appointments = res['appointments'] ?? [];
+        _loading = false;
+      });
     } catch (_) {
       setState(() => _loading = false);
     }
@@ -38,19 +43,27 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = LanguageService.instance.strings;
     return Scaffold(
-      appBar: AppBar(title: const Text('My Appointments')),
+      appBar: AppBar(title: Text(s.appointmentsTitle)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _appointments.isEmpty
-              ? const Center(child: Text('No appointments yet'))
+              ? Center(child: Text(s.noAppointments))
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: _appointments.length,
                   itemBuilder: (context, index) {
                     final a = _appointments[index];
                     final hospital = a['hospitalId'];
-                    final date = DateTime.tryParse(a['createdAt'] ?? '') ?? DateTime.now();
+                    final date =
+                        DateTime.tryParse(a['createdAt'] ?? '') ??
+                            DateTime.now();
+                    final imageUrl = hospital?['imageUrl'] as String?;
+                    final photoUrl =
+                        imageUrl != null && imageUrl.isNotEmpty
+                            ? '${AuthService.uploadsBase}$imageUrl'
+                            : null;
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       child: Padding(
@@ -59,34 +72,98 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
                               children: [
-                                Expanded(child: Text(hospital?['name'] ?? 'Hospital', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                                if (photoUrl != null)
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(photoUrl,
+                                        width: 48,
+                                        height: 48,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            const SizedBox.shrink()),
+                                  ),
+                                if (photoUrl != null)
+                                  const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    hospital?['name'] ?? 'Hospital',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16),
+                                  ),
+                                ),
                                 Chip(
-                                  label: Text(a['status'] ?? 'pending', style: TextStyle(color: _statusColor(a['status'] ?? 'pending'), fontSize: 12)),
-                                  backgroundColor: _statusColor(a['status'] ?? 'pending').withAlpha(25),
+                                  label: Text(
+                                    a['status'] ?? 'pending',
+                                    style: TextStyle(
+                                        color: _statusColor(
+                                            a['status'] ?? 'pending'),
+                                        fontSize: 12),
+                                  ),
+                                  backgroundColor: _statusColor(
+                                          a['status'] ?? 'pending')
+                                      .withAlpha(25),
                                 ),
                               ],
                             ),
-                            if (a['conditionLabel'] != null && a['conditionLabel'].isNotEmpty)
-                              Padding(padding: const EdgeInsets.only(top: 4), child: Text('Condition: ${a['conditionLabel']}', style: const TextStyle(color: Colors.grey))),
+                            if (a['conditionLabel'] != null &&
+                                a['conditionLabel'].isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  s.condition(a['conditionLabel']),
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
+                              ),
                             const SizedBox(height: 4),
-                            Text('Fee: ${a['bookingFee']} ETB  |  ${date.day}/${date.month}/${date.year}', style: const TextStyle(fontSize: 13, color: Colors.grey)),
-                            if (a['status'] == 'approved' && a['appointmentDate'] != null)
+                            Text(
+                              s.feeAndDate(
+                                '${a['bookingFee']}',
+                                '${date.day}/${date.month}/${date.year}',
+                              ),
+                              style: const TextStyle(
+                                  fontSize: 13, color: Colors.grey),
+                            ),
+                            if (a['status'] == 'approved' &&
+                                a['appointmentDate'] != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 8),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.event, size: 16, color: Colors.green),
+                                    const Icon(Icons.event,
+                                        size: 16, color: Colors.green),
                                     const SizedBox(width: 4),
-                                    Text('Appointment: ${DateTime.tryParse(a['appointmentDate'] ?? '')?.toLocal().toString().substring(0, 16) ?? '-'}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w500)),
+                                    Text(
+                                      s.appointment(
+                                        DateTime.tryParse(
+                                                    a['appointmentDate'] ??
+                                                        '')
+                                                ?.toLocal()
+                                                .toString()
+                                                .substring(0, 16) ??
+                                            '-',
+                                      ),
+                                      style: const TextStyle(
+                                          color: Colors.green,
+                                          fontWeight: FontWeight.w500),
+                                    ),
                                   ],
                                 ),
                               ),
-                            if (a['status'] == 'rejected' && a['rejectionReason'] != null && a['rejectionReason'].isNotEmpty)
+                            if (a['status'] == 'rejected' &&
+                                a['rejectionReason'] != null &&
+                                a['rejectionReason'].isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 8),
-                                child: Text('Reason: ${a['rejectionReason']}', style: TextStyle(color: Colors.red.shade700, fontSize: 13)),
+                                child: Text(
+                                  s.reason(a['rejectionReason']),
+                                  style: TextStyle(
+                                      color: Colors.red.shade700,
+                                      fontSize: 13),
+                                ),
                               ),
                           ],
                         ),

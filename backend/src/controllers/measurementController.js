@@ -2,6 +2,14 @@ const { Measurement, AIInsight, Patient } = require('../models');
 const { analyzeVitals } = require('../services/llmService');
 const { findNearbyHospitals } = require('../services/mapsService');
 
+function normalizeVitals(vitals) {
+  if (!vitals || typeof vitals !== 'object') return vitals;
+  const out = { ...vitals };
+  // Treat weight 0 as no sensor (store null like other missing params)
+  if (out.weightKg === 0) out.weightKg = null;
+  return out;
+}
+
 exports.createMeasurement = async (req, res) => {
   try {
     const patientId = req.user.id;
@@ -10,7 +18,7 @@ exports.createMeasurement = async (req, res) => {
     const measurement = await Measurement.create({
       patientId,
       kioskId,
-      vitals,
+      vitals: normalizeVitals(vitals),
       measuredAt: measuredAt || new Date(),
       syncStatus: 'synced',
     });
@@ -23,7 +31,7 @@ exports.createMeasurement = async (req, res) => {
 
 exports.analyzeAndSuggest = async (req, res) => {
   try {
-    const { measurementId, latitude, longitude } = req.body;
+    const { measurementId, latitude, longitude, language } = req.body;
     const patientId = req.user.id;
 
     const measurement = await Measurement.findOne({ _id: measurementId, patientId });
@@ -36,7 +44,7 @@ exports.analyzeAndSuggest = async (req, res) => {
       .lean();
 
     const historyVitals = history.map(h => h.vitals);
-    const llmResult = await analyzeVitals(measurement.vitals, historyVitals);
+    const llmResult = await analyzeVitals(measurement.vitals, historyVitals, language);
 
     const insight = await AIInsight.create({
       measurementId: measurement._id,
@@ -45,6 +53,7 @@ exports.analyzeAndSuggest = async (req, res) => {
       riskLevel: llmResult.riskLevel,
       conditionCategory: llmResult.conditionCategory,
       preventiveAdvice: llmResult.preventiveAdvice,
+      isRuleBased: llmResult.isRuleBased === true,
     });
 
     const lat = latitude || 0;

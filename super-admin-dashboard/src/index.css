@@ -1,1 +1,10 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+/* Ensure Leaflet map container has size when used in the Hospitals form */
+.leaflet-container {
+  height: 100%;
+  min-height: 300px;
+  width: 100%;
+  z-index: 0;
+}
