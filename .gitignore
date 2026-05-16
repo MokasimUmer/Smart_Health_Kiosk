@@ -1,0 +1,25 @@
+# Secrets — never commit API keys or credentials
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Logs & OS
+*.log
+.DS_Store
+Thumbs.db
+
+# Build / uploads (local)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Flutter / Dart
+mobile_app/.dart_tool/
+mobile_app/build/
+mobile_app/.flutter-plugins-dependencies
+
+# Dashboard builds
+hospital-dashboard/dist/
+super-admin-dashboard/dist/
