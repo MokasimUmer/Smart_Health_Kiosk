@@ -116,13 +116,39 @@ exports.getKiosks = async (_req, res) => {
 
 exports.createStaffAccount = async (req, res) => {
   try {
-    const { username, password, role, name, hospitalId } = req.body;
+    const { username, password, role, name, hospitalId, providerRole: prBody } = req.body;
     if (!['provider', 'super_admin'].includes(role)) {
       return res.status(400).json({ error: 'Role must be provider or super_admin' });
     }
+
+    let providerRole = 'hospital_admin';
+    if (role === 'provider') {
+      providerRole = prBody === 'doctor' ? 'doctor' : 'hospital_admin';
+      if (!hospitalId) {
+        return res.status(400).json({ error: 'Hospital is required for provider accounts' });
+      }
+      if (providerRole === 'hospital_admin') {
+        const existingAdmin = await UserAccount.findOne({
+          hospitalId,
+          role: 'provider',
+          providerRole: 'hospital_admin',
+          isActive: true,
+        });
+        if (existingAdmin) {
+          return res.status(400).json({
+            error: 'This hospital already has an active hospital administrator. Deactivate that account first, or create a staff doctor instead.',
+          });
+        }
+      }
+    }
+
     const user = await UserAccount.create({
-      username, password, role, name,
+      username,
+      password,
+      role,
+      name,
       hospitalId: hospitalId || null,
+      providerRole: role === 'provider' ? providerRole : 'hospital_admin',
     });
     res.status(201).json({ user });
   } catch (err) {

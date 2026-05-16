@@ -52,6 +52,7 @@ exports.staffLogin = async (req, res) => {
       id: user._id,
       role: user.role,
       hospitalId: user.hospitalId?.toString() || null,
+      providerRole: user.role === 'provider' ? (user.providerRole || 'hospital_admin') : undefined,
     });
     res.json({ token, user });
   } catch (err) {

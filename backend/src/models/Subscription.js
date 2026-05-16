@@ -7,9 +7,9 @@ const subscriptionSchema = new mongoose.Schema({
     required: true,
   },
   paymentType: { type: String, default: 'annual_subscription' },
-  receiptImageUrl: { type: String, required: true },
   amount: { type: Number, required: true },
-  paymentMethod: { type: String, required: true },
+  paymentMethod: { type: String, default: 'chapa' },
+  chapaTxRef: { type: String, default: '' },
   status: {
     type: String,
     enum: ['pending', 'approved', 'rejected', 'expired'],

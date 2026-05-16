@@ -12,6 +12,9 @@ const subscriptionRoutes = require('./routes/subscriptions');
 const measurementRoutes = require('./routes/measurements');
 const appointmentRoutes = require('./routes/appointments');
 const adminRoutes = require('./routes/admin');
+const staffRoutes = require('./routes/staff');
+const paymentRoutes = require('./routes/payments');
+const mapsRoutes = require('./routes/maps');
 
 const app = express();
 const server = http.createServer(app);
@@ -25,6 +28,9 @@ app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/measurements', measurementRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/staff', staffRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/maps', mapsRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 

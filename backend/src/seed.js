@@ -1,7 +1,7 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const connectDB = require('./config/db');
-const { UserAccount, Hospital, Kiosk } = require('./models');
+const { UserAccount, Hospital, Kiosk, DoctorAvailability } = require('./models');
 
 async function seed() {
   await connectDB();
@@ -43,10 +43,63 @@ async function seed() {
       username: 'doctor1',
       password: 'doctor123',
       role: 'provider',
+      providerRole: 'hospital_admin',
       name: 'Dr. Abebe',
       hospitalId: hospitals[0]._id,
     });
-    console.log('Created provider account: doctor1 / doctor123');
+    console.log('Created provider account: doctor1 / doctor123 (hospital administrator)');
+
+    const doctor2 = await UserAccount.create({
+      username: 'doctor2',
+      password: 'doctor123',
+      role: 'provider',
+      providerRole: 'doctor',
+      name: 'Dr. Tadesse',
+      hospitalId: hospitals[0]._id,
+    });
+    await DoctorAvailability.insertMany(
+      [1, 2, 3, 4, 5].map((dayOfWeek) => ({
+        hospitalId: hospitals[0]._id,
+        doctorId: doctor2._id,
+        dayOfWeek,
+        startTime: '09:00',
+        endTime: '17:00',
+      })),
+    );
+    console.log('Created staff doctor: doctor2 / doctor123 with Mon–Fri 09:00–17:00 availability');
+  }
+
+  await UserAccount.updateMany(
+    { username: 'doctor1', role: 'provider' },
+    { $set: { providerRole: 'hospital_admin' } },
+  );
+
+  const firstHospital = await Hospital.findOne().sort({ createdAt: 1 });
+  if (firstHospital) {
+    const d2 = await UserAccount.findOne({ username: 'doctor2' });
+    if (!d2) {
+      const doctor2 = await UserAccount.create({
+        username: 'doctor2',
+        password: 'doctor123',
+        role: 'provider',
+        providerRole: 'doctor',
+        name: 'Dr. Tadesse',
+        hospitalId: firstHospital._id,
+      });
+      const count = await DoctorAvailability.countDocuments({ doctorId: doctor2._id });
+      if (count === 0) {
+        await DoctorAvailability.insertMany(
+          [1, 2, 3, 4, 5].map((dayOfWeek) => ({
+            hospitalId: firstHospital._id,
+            doctorId: doctor2._id,
+            dayOfWeek,
+            startTime: '09:00',
+            endTime: '17:00',
+          })),
+        );
+      }
+      console.log('Ensured demo staff doctor doctor2 / doctor123 at first hospital');
+    }
   }
 
   const kioskCount = await Kiosk.countDocuments();

@@ -1,5 +1,6 @@
 const mqtt = require('mqtt');
 const { Measurement } = require('../models');
+const { normalizeVitals } = require('../utils/vitalsNormalize');
 
 let client = null;
 let ioInstance = null;
@@ -51,7 +52,7 @@ function init(io) {
       const measurement = await Measurement.create({
         patientId,
         kioskId,
-        vitals: payload.vitals,
+        vitals: normalizeVitals(payload.vitals),
         measuredAt,
         syncStatus: 'synced',
       });

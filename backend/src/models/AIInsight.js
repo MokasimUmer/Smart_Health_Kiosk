@@ -18,6 +18,8 @@ const aiInsightSchema = new mongoose.Schema({
     default: 'low',
   },
   conditionCategory: { type: String, default: '' },
+  /** Two English tokens from the LLM for ranking hospitals (name / address / specializations). */
+  rankKeywords: [{ type: String }],
   preventiveAdvice: { type: String, default: '' },
   disclaimer: {
     type: String,

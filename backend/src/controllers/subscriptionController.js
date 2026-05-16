@@ -1,37 +1,5 @@
 const { Subscription, Patient } = require('../models');
-const { notifyPatient, notifySuperAdmin } = require('../services/socketService');
-
-exports.createSubscription = async (req, res) => {
-  try {
-    const patientId = req.user.id;
-    const { amount, paymentMethod } = req.body;
-
-    if (!req.file) {
-      return res.status(400).json({ error: 'Receipt image is required' });
-    }
-
-    const pending = await Subscription.findOne({ patientId, status: 'pending' });
-    if (pending) {
-      return res.status(409).json({ error: 'You already have a pending subscription request' });
-    }
-
-    const subscription = await Subscription.create({
-      patientId,
-      receiptImageUrl: `/uploads/${req.file.filename}`,
-      amount: Number(amount),
-      paymentMethod,
-    });
-
-    notifySuperAdmin('new_subscription_request', {
-      subscriptionId: subscription._id,
-      patientId,
-    });
-
-    res.status(201).json({ subscription });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
+const { notifyPatient } = require('../services/socketService');
 
 exports.getMySubscription = async (req, res) => {
   try {

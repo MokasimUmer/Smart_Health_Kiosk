@@ -21,9 +21,14 @@ const appointmentSchema = new mongoose.Schema({
     ref: 'AIInsight',
     default: null,
   },
-  receiptImageUrl: { type: String, required: true },
   bookingFee: { type: Number, required: true },
-  paymentMethod: { type: String, required: true },
+  paymentMethod: { type: String, default: 'chapa' },
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'paid', 'failed'],
+    default: 'paid',
+  },
+  chapaTxRef: { type: String, default: '', index: true },
   conditionLabel: { type: String, default: '' },
   status: {
     type: String,
@@ -34,6 +39,16 @@ const appointmentSchema = new mongoose.Schema({
   reviewedAt: { type: Date, default: null },
   rejectionReason: { type: String, default: '' },
   appointmentDate: { type: Date, default: null },
+  assignedDoctorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'UserAccount',
+    default: null,
+  },
+  assignedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'UserAccount',
+    default: null,
+  },
 }, { timestamps: true });
 
 appointmentSchema.index({ hospitalId: 1, status: 1 });

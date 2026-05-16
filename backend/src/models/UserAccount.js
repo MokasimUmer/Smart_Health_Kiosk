@@ -9,6 +9,12 @@ const userAccountSchema = new mongoose.Schema({
     enum: ['provider', 'super_admin'],
     required: true,
   },
+  /** For role=provider: hospital coordinator vs staff doctor */
+  providerRole: {
+    type: String,
+    enum: ['hospital_admin', 'doctor'],
+    default: 'hospital_admin',
+  },
   name: { type: String, required: true, trim: true },
   hospitalId: {
     type: mongoose.Schema.Types.ObjectId,

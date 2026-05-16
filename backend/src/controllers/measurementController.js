@@ -1,14 +1,7 @@
 const { Measurement, AIInsight, Patient } = require('../models');
 const { analyzeVitals } = require('../services/llmService');
 const { findNearbyHospitals } = require('../services/mapsService');
-
-function normalizeVitals(vitals) {
-  if (!vitals || typeof vitals !== 'object') return vitals;
-  const out = { ...vitals };
-  // Treat weight 0 as no sensor (store null like other missing params)
-  if (out.weightKg === 0) out.weightKg = null;
-  return out;
-}
+const { normalizeVitals } = require('../utils/vitalsNormalize');
 
 exports.createMeasurement = async (req, res) => {
   try {
@@ -31,7 +24,7 @@ exports.createMeasurement = async (req, res) => {
 
 exports.analyzeAndSuggest = async (req, res) => {
   try {
-    const { measurementId, latitude, longitude, language } = req.body;
+    const { measurementId, latitude, longitude, language, audience } = req.body;
     const patientId = req.user.id;
 
     const measurement = await Measurement.findOne({ _id: measurementId, patientId });
@@ -44,7 +37,12 @@ exports.analyzeAndSuggest = async (req, res) => {
       .lean();
 
     const historyVitals = history.map(h => h.vitals);
-    const llmResult = await analyzeVitals(measurement.vitals, historyVitals, language);
+    const llmResult = await analyzeVitals(
+      measurement.vitals,
+      historyVitals,
+      language,
+      audience === 'clinic' ? 'clinic' : 'patient',
+    );
 
     const insight = await AIInsight.create({
       measurementId: measurement._id,
@@ -52,13 +50,20 @@ exports.analyzeAndSuggest = async (req, res) => {
       summaryText: llmResult.summaryText,
       riskLevel: llmResult.riskLevel,
       conditionCategory: llmResult.conditionCategory,
+      rankKeywords: Array.isArray(llmResult.rankKeywords) ? llmResult.rankKeywords : [],
       preventiveAdvice: llmResult.preventiveAdvice,
       isRuleBased: llmResult.isRuleBased === true,
     });
 
     const lat = latitude || 0;
     const lng = longitude || 0;
-    const hospitals = await findNearbyHospitals(lat, lng, llmResult.conditionCategory);
+    const hospitals = await findNearbyHospitals(
+      lat,
+      lng,
+      llmResult.conditionCategory,
+      50000,
+      llmResult.rankKeywords,
+    );
 
     res.json({ insight, hospitals });
   } catch (err) {

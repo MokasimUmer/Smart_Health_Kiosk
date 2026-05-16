@@ -1,18 +1,49 @@
 const { Hospital } = require('../models');
 
-async function findNearbyHospitals(lat, lng, conditionCategory, radiusMeters = 50000) {
-  const registeredHospitals = await findRegisteredHospitals(lat, lng, conditionCategory, radiusMeters);
+/** Score for sorting: LLM rankKeywords vs name, address, specializations (substring, case-insensitive). */
+function hospitalKeywordScore(h, rankKeywords) {
+  if (!rankKeywords || !rankKeywords.length) return 0;
+  const specs = Array.isArray(h.specializations) ? h.specializations : [];
+  const hay = [h.name, h.address, ...specs].filter(Boolean).join(' ').toLowerCase();
+  let score = 0;
+  for (const raw of rankKeywords.slice(0, 2)) {
+    const k = String(raw).toLowerCase().trim();
+    if (k.length < 2) continue;
+    if (hay.includes(k)) score += 10;
+  }
+  return score;
+}
+
+function sortHospitalsByRank(lat, lng, rows, rankKeywords) {
+  const withDist = rows.map(h => ({
+    h,
+    dist: calculateDistance(lat, lng, h.location.coordinates[1], h.location.coordinates[0]),
+    score: hospitalKeywordScore(h, rankKeywords),
+  }));
+  withDist.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (a.dist !== b.dist) return a.dist - b.dist;
+    const fa = a.h.bookingFee != null ? a.h.bookingFee : Number.POSITIVE_INFINITY;
+    const fb = b.h.bookingFee != null ? b.h.bookingFee : Number.POSITIVE_INFINITY;
+    return fa - fb;
+  });
+  return withDist;
+}
+
+async function findNearbyHospitals(lat, lng, conditionCategory, radiusMeters = 50000, rankKeywords = []) {
+  const googleQuery = (rankKeywords && rankKeywords[0]) || conditionCategory;
+  const registeredHospitals = await findRegisteredHospitals(lat, lng, radiusMeters, rankKeywords);
   let googleHospitals = [];
 
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (apiKey && apiKey !== 'your_google_maps_api_key') {
-    googleHospitals = await searchGoogleMaps(lat, lng, conditionCategory, radiusMeters, apiKey);
+    googleHospitals = await searchGoogleMaps(lat, lng, googleQuery, radiusMeters, apiKey);
   }
 
   const registeredPlaceIds = new Set(
     registeredHospitals.filter(h => h.googlePlaceId).map(h => h.googlePlaceId)
   );
-  const externalHospitals = googleHospitals
+  let externalHospitals = googleHospitals
     .filter(g => !registeredPlaceIds.has(g.placeId))
     .map(g => ({
       source: 'google_maps',
@@ -25,13 +56,24 @@ async function findNearbyHospitals(lat, lng, conditionCategory, radiusMeters = 5
       specializations: [],
     }));
 
+  const extRows = externalHospitals.map(e => ({
+    name: e.name,
+    address: e.address,
+    specializations: e.specializations || [],
+    location: e.location,
+    bookingFee: e.bookingFee,
+    _raw: e,
+  }));
+  const sortedExt = sortHospitalsByRank(lat, lng, extRows, rankKeywords);
+  externalHospitals = sortedExt.map(({ h }) => h._raw);
+
   return {
     registered: registeredHospitals,
     external: externalHospitals,
   };
 }
 
-async function findRegisteredHospitals(lat, lng, conditionCategory, radiusMeters) {
+async function findRegisteredHospitals(lat, lng, radiusMeters, rankKeywords = []) {
   const query = {
     isActive: true,
     location: {
@@ -42,20 +84,10 @@ async function findRegisteredHospitals(lat, lng, conditionCategory, radiusMeters
     },
   };
 
-  let hospitals = await Hospital.find(query).limit(20).lean();
+  const hospitals = await Hospital.find(query).limit(20).lean();
+  const sorted = sortHospitalsByRank(lat, lng, hospitals, rankKeywords);
 
-  if (conditionCategory && conditionCategory !== 'normal') {
-    const matching = hospitals.filter(h =>
-      h.specializations.some(s =>
-        s.toLowerCase().includes(conditionCategory.toLowerCase()) ||
-        conditionCategory.toLowerCase().includes(s.toLowerCase())
-      )
-    );
-    const others = hospitals.filter(h => !matching.includes(h));
-    hospitals = [...matching, ...others];
-  }
-
-  return hospitals.map(h => ({
+  return sorted.map(({ h, dist }) => ({
     source: 'registered',
     _id: h._id,
     name: h.name,
@@ -64,7 +96,8 @@ async function findRegisteredHospitals(lat, lng, conditionCategory, radiusMeters
     bookingFee: h.bookingFee,
     location: h.location,
     imageUrl: h.imageUrl || null,
-    distance: calculateDistance(lat, lng, h.location.coordinates[1], h.location.coordinates[0]),
+    googlePlaceId: h.googlePlaceId || null,
+    distance: dist,
   }));
 }
 

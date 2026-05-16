@@ -8,4 +8,6 @@ module.exports = {
   AIInsight: require('./AIInsight'),
   Appointment: require('./Appointment'),
   PatientHospitalAccess: require('./PatientHospitalAccess'),
+  DoctorAvailability: require('./DoctorAvailability'),
+  PaymentIntent: require('./PaymentIntent'),
 };
