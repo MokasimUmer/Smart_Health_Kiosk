@@ -32,6 +32,15 @@ app.use('/api/staff', staffRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/maps', mapsRoutes);
 
+app.get('/', (_req, res) => {
+  res.json({
+    service: 'Smart Health Kiosk API',
+    status: 'ok',
+    health: '/api/health',
+    docs: 'All routes are under /api/*',
+  });
+});
+
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 
 const PORT = process.env.PORT || 5000;
